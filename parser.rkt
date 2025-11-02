@@ -340,16 +340,15 @@
 ;; expr -> term + expr | term - expr | term
 (define (parse-expr)
   (let ([t (parse-term)])
-    (check-no-newline!)
     (cond
       [(match-token? 'PLUS)
        (next-token!)
-       (check-no-newline!)
+       (check-no-newline!)  ; Only check AFTER committing to parse more
        (let ([e (parse-expr)])
          (list 'expr t '+ e))]
       [(match-token? 'MINUS)
        (next-token!)
-       (check-no-newline!)
+       (check-no-newline!)  ; Only check AFTER committing to parse more
        (let ([e (parse-expr)])
          (list 'expr t '- e))]
       [else
@@ -358,16 +357,15 @@
 ;; term -> factor * term | factor / term | factor
 (define (parse-term)
   (let ([f (parse-factor)])
-    (check-no-newline!)
     (cond
       [(match-token? 'MULT)
        (next-token!)
-       (check-no-newline!)
+       (check-no-newline!)  ; Only check AFTER committing to parse more
        (let ([t (parse-term)])
          (list 'term f '* t))]
       [(match-token? 'DIV)
        (next-token!)
-       (check-no-newline!)
+       (check-no-newline!)  ; Only check AFTER committing to parse more
        (let ([t (parse-term)])
          (list 'term f '/ t))]
       [else
@@ -375,7 +373,6 @@
 
 ;; factor -> id | num | (expr)
 (define (parse-factor)
-  (check-no-newline!)
   (cond
     [(match-token? 'ID)
      (let ([id (expect-token 'ID)])
@@ -385,15 +382,17 @@
        (list 'factor 'num (token-value num)))]
     [(match-token? 'LPAREN)
      (next-token!)
-     (check-no-newline!)
      (let ([expr (parse-expr)])
-       (check-no-newline!)
        (expect-token 'RPAREN)
        (list 'factor expr))]
+    [(match-token? 'NEWLINE)
+     (let ([tok (peek-token)])
+       (set! parse-error-line (token-line tok))
+       (error 'parse "Expression cannot cross line break on line ~a" (token-line tok)))]
     [else
      (let ([tok (peek-token)])
        (set! parse-error-line (token-line tok))
-       (error 'parse "Expected factor on line ~a" (token-line tok)))]))
+       (error 'parse "Expected factor on line ~a, got ~a" (token-line tok) (token-type tok)))]))
 
 ;; comp-op -> = | > | < | >= | <= | <>
 (define (parse-comp-op)
